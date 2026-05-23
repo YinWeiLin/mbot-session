@@ -1,20 +1,26 @@
 from typing import Dict
 import sys
 import os
+import uuid
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from mbot import MbotSession
 
-# session_id -> MbotSession 实例
 _store: Dict[str, MbotSession] = {}
 
 
-def get_or_create_session(session_id: str, user_id: str) -> MbotSession:
-    if session_id not in _store:
-        _store[session_id] = MbotSession(user_id=user_id, session_id=session_id)
-    return _store[session_id]
+async def create_session(user_id: str = "default_user") -> MbotSession:
+    ssid = str(uuid.uuid4())[:8]
+    session = MbotSession(user_id=user_id, session_id=ssid)
+    await session.init()
+    _store[ssid] = session
+    return session
 
 
-def remove_session(session_id: str) -> None:
-    _store.pop(session_id, None)
+def get_session(ssid: str) -> MbotSession | None:
+    return _store.get(ssid)
+
+
+def remove_session(ssid: str) -> None:
+    _store.pop(ssid, None)
