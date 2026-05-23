@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Aligo 商旅助手 - CLI 交互界面
-使用 Rich 库实现美观的终端交互
+mbot 商家智能体 - 核心会话逻辑
 """
 from rich.console import Console
 from rich.prompt import Prompt
@@ -26,8 +25,8 @@ import time
 import uuid
 
 
-class AligoCLI:
-    """Aligo 商旅助手 CLI"""
+class MbotSession:
+    """mbot 商家智能体会话"""
 
     def __init__(self):
         """初始化 CLI"""
@@ -79,7 +78,7 @@ class AligoCLI:
 
         # 初始化日志
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        setup_logger(self.session_id, project_root, self.user_id, LLM_CONFIG["model_name"])
+        setup_logger(project_root)
 
         with self.console.status("初始化中...", spinner="dots"):
             # 初始化AgentScope
