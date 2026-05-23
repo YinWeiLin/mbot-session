@@ -26,7 +26,7 @@ import uuid
 
 
 class MbotSession:
-    """mbot 商家智能体会话"""
+    """ mbot 商家智能体会话 """
 
     def __init__(self):
         """初始化 CLI"""
