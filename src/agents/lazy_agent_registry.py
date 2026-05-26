@@ -49,7 +49,8 @@ class LazyAgentRegistry:
             "preference": "preference",
             "information_query": "query-info",
             "itinerary_planning": "plan-trip",
-            "event_collection": "event-collection"
+            "event_collection": "event-collection",
+            "need_stimulation": "need-stimulation",
         }
 
     def _discover_skills(self):

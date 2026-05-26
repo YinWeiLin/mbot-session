@@ -16,6 +16,7 @@
 from agentscope.agent import AgentBase
 from agentscope.message import Msg
 from typing import Optional, Union, List, Dict, Any
+from constants import SessionStage
 import json
 import logging
 import asyncio
@@ -45,6 +46,7 @@ class OrchestrationAgent(AgentBase):
         self.name = name
         self.agent_registry = agent_registry or {}
         self.memory_manager = memory_manager
+        self.turn_count: int = 0  # 当前会话已处理轮次，用于控制 need_stimulation 的触发频率
 
     def register_agent(self, agent_name: str, agent: AgentBase):
         """注册子智能体"""
@@ -73,6 +75,8 @@ class OrchestrationAgent(AgentBase):
                 content=json.dumps({"error": "No input provided"}),
                 role="assistant"
             )
+
+        self.turn_count += 1
 
         # 解析输入
         if isinstance(x, list):
@@ -103,7 +107,15 @@ class OrchestrationAgent(AgentBase):
                 role="assistant"
             )
 
-        # 按优先级排序
+        # 按优先级排序，need_stimulation 由调度器按策略插入
+        if self._should_engage(intention_data):
+            agent_schedule.append({
+                "agent_name": "need_stimulation",
+                "priority": 999,
+                "reason": "需求激发策略触发",
+                "expected_output": "engage_text"
+            })
+
         sorted_schedule = sorted(agent_schedule, key=lambda x: x.get("priority", 999))
 
         logger.info(f"开始协调调度 {len(sorted_schedule)} 个智能体")
@@ -162,7 +174,8 @@ class OrchestrationAgent(AgentBase):
             "reasoning": intention_data.get("reasoning", ""),
             "intents": intention_data.get("intents", []),
             "key_entities": intention_data.get("key_entities", {}),
-            "rewritten_query": intention_data.get("rewritten_query", "")
+            "rewritten_query": intention_data.get("rewritten_query", ""),
+            "session_stage": intention_data.get("session_stage", "looking"),
         }
 
         # 从记忆系统获取上下文
@@ -364,6 +377,7 @@ class OrchestrationAgent(AgentBase):
         """
         aggregated = {
             "status": "completed",
+            "session_stage": intention_data.get("session_stage", "looking"),
             "intention": {
                 "intents": intention_data.get("intents", []),
                 "key_entities": intention_data.get("key_entities", {})
@@ -483,3 +497,14 @@ class OrchestrationAgent(AgentBase):
                         logger.info(f"行程已保存至长期记忆: {origin} -> {destination}")
 
         logger.info("记忆系统已更新")
+
+    def _should_engage(self, intention_data: dict) -> bool:
+        try:
+            stage = SessionStage[intention_data.get("session_stage", "looking").upper()]
+        except KeyError:
+            return False
+        if stage == SessionStage.ACTING:
+            return True
+        if stage == SessionStage.CONSIDERING:
+            return self.turn_count % 2 == 0
+        return False

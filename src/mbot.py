@@ -13,6 +13,7 @@ from utils.logger import setup_logger
 from agents.intention_agent import IntentionAgent
 from agents.orchestration_agent import OrchestrationAgent
 from agents.lazy_agent_registry import LazyAgentRegistry
+from constants import SessionStage
 import json
 import logging
 import os
@@ -43,6 +44,7 @@ class MbotSession:
         self._agent_cache = {}
         self.circuit_breaker: CircuitBreaker = None
         self._initialized = False
+        self.session_stage: SessionStage = SessionStage.LOOKING
 
     async def init(self):
         """初始化核心组件，CLI 和 HTTP 均调用此方法"""
@@ -56,6 +58,7 @@ class MbotSession:
         self.model = OpenAIChatModel(
             model_name=LLM_CONFIG["model_name"],
             api_key=LLM_CONFIG["api_key"],
+            stream=False,
             client_kwargs={
                 "base_url": LLM_CONFIG["base_url"],
                 "timeout": float(timeout_sec),
@@ -135,11 +138,33 @@ class MbotSession:
                 self.circuit_breaker.record_failure()
             raise
 
-        # 3. 校验意图结果
+        # 3. 校验意图结果，并推进会话阶段（只进不退），写回后调度器拿到的永远是历史最高阶段
         try:
-            json.loads(intention_result.content)
+            intention_data = json.loads(intention_result.content)
         except json.JSONDecodeError:
             return "无法理解您的需求，请重新描述。"
+
+        try:
+            llm_stage = SessionStage[intention_data.get("session_stage", "").upper()]
+        except KeyError:
+            llm_stage = SessionStage.LOOKING
+        if llm_stage > self.session_stage:
+            logger.info(f"会话阶段推进: {self.session_stage.name} → {llm_stage.name}")
+            self.session_stage = llm_stage
+            peak_str = self.memory_manager.long_term.get_preference("peak_session_stage") or "looking"
+            try:
+                peak = SessionStage[peak_str.upper()]
+            except KeyError:
+                peak = SessionStage.LOOKING
+            if self.session_stage > peak:
+                self.memory_manager.long_term.save_preference("peak_session_stage", self.session_stage.name.lower())
+
+        intention_data["session_stage"] = self.session_stage.name.lower()
+        intention_result = Msg(
+            name=intention_result.name,
+            content=json.dumps(intention_data, ensure_ascii=False),
+            role=intention_result.role,
+        )
 
         # 4. 写短期记忆
         self.memory_manager.add_message("user", user_input)
@@ -169,6 +194,7 @@ class MbotSession:
 
         reply_text = self._collect_reply(result_data)
         self.memory_manager.add_message("assistant", json.dumps(result_data, ensure_ascii=False))
+
         return reply_text
 
     def end_session(self):
@@ -333,6 +359,9 @@ class MbotSession:
             if missing:
                 parts.append(f"还需要补充：{', '.join(missing)}")
             return "\n".join(parts)
+
+        if agent_name == "need_stimulation":
+            return data.get("engage_text", "")
 
         # 通用兜底
         common_keys = ["answer", "content", "result", "message", "summary", "text", "description"]

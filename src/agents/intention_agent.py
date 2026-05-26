@@ -95,11 +95,9 @@ class IntentionAgent(AgentBase):
         # 动态获取 Skills 描述
         skill_mapping = {
             "memory-query": "memory_query",
-            "plan-trip": "itinerary_planning", 
-            "preference": "preference",
-            "query-info": "information_query",
             "ask-question": "rag_knowledge",
-            "event-collection": "event_collection"
+            "query-info": "information_query",
+            # need-stimulation 不放入，由调度器强制插入，避免 LLM 双重触发
         }
         
         dynamic_skills_prompt = self.skill_loader.get_skill_prompt(skill_mapping)

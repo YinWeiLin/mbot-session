@@ -75,24 +75,36 @@ async def retry_with_backoff(
 
 
 async def parse_llm_response(response) -> str:
-    """解析 LLM 响应，兼容流式和非流式两种返回格式。"""
-    summary = ""
-    if hasattr(response, "__aiter__"):
+    """解析 LLM 响应，兼容 ChatResponse（非流式）和 AsyncGenerator（流式）两种返回格式。"""
+    from agentscope.model import ChatResponse
+
+    # 非流式：AgentScope ChatResponse，content 是 list[dict]，取 type==text 的部分
+    if isinstance(response, ChatResponse):
+        content = response.content or []
+        return "".join(
+            block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
+            for block in content
+            if (block.get("type") if isinstance(block, dict) else getattr(block, "type", "")) == "text"
+        )
+
+    # 流式：AsyncGenerator，每个 chunk 是 ChatResponse，拼接最后一个 text
+    try:
+        is_async_gen = hasattr(type(response), "__aiter__")
+    except Exception:
+        is_async_gen = False
+
+    if is_async_gen:
+        summary = ""
         async for chunk in response:
-            if isinstance(chunk, str):
-                summary += chunk
-            elif hasattr(chunk, "content"):
-                if isinstance(chunk.content, str):
-                    summary += chunk.content
-                elif isinstance(chunk.content, list):
-                    for item in chunk.content:
-                        if isinstance(item, dict) and item.get("type") == "text":
-                            summary += item.get("text", "")
-    elif hasattr(response, "content"):
-        summary = str(response.content)
-    else:
-        summary = str(response)
-    return summary
+            if isinstance(chunk, ChatResponse):
+                for block in (chunk.content or []):
+                    t = block.get("type") if isinstance(block, dict) else getattr(block, "type", "")
+                    if t == "text":
+                        summary = block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
+        return summary
+
+    # 兜底
+    return str(response)
 
 
 async def run_health_check(
