@@ -9,7 +9,7 @@ from config import LLM_CONFIG, SYSTEM_CONFIG, RESILIENCE_CONFIG
 from memory_system.memory_manager import MemoryManager
 from utils.circuit_breaker import CircuitBreaker, CircuitOpenError
 from utils.llm_resilience import retry_with_backoff
-from utils.logger import setup_logger
+from utils.logger import setup_logger, set_session_id
 from agents.intention_agent import IntentionAgent
 from agents.orchestration_agent import OrchestrationAgent
 from agents.lazy_agent_registry import LazyAgentRegistry
@@ -53,6 +53,7 @@ class MbotSession:
 
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         setup_logger(project_root)
+        set_session_id(self.session_id)
 
         timeout_sec = SYSTEM_CONFIG.get("timeout", 60)
         self.model = OpenAIChatModel(
@@ -148,6 +149,7 @@ class MbotSession:
             llm_stage = SessionStage[intention_data.get("session_stage", "").upper()]
         except KeyError:
             llm_stage = SessionStage.LOOKING
+        logger.info(f"会话阶段: 当前={self.session_stage.name} LLM识别={llm_stage.name}")
         if llm_stage > self.session_stage:
             logger.info(f"会话阶段推进: {self.session_stage.name} → {llm_stage.name}")
             self.session_stage = llm_stage

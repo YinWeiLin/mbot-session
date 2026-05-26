@@ -23,6 +23,8 @@ data/preferences/*.json
 data/memory/*.json
 data/models/
 **/rag_knowledge/
+**/documents_trip/
+**/documents_structured/
 
 # Logs
 *.log

@@ -82,9 +82,7 @@ def split_text(text: str, max_chars: int = 600, overlap: int = 100) -> List[str]
     return chunks
 
 def load_documents_from_directory(directory_path: str) -> List[Dict]:
-    """
-    从指定目录加载所有文档
-    """
+    """从 documents_structured/ 加载文档，每个文件按 --- 分隔符拆成独立 chunk"""
     documents = []
     doc_dir = Path(directory_path)
 
@@ -92,82 +90,59 @@ def load_documents_from_directory(directory_path: str) -> List[Dict]:
         print(f"❌ 文档目录不存在: {directory_path}")
         return documents
 
-    # 获取所有.txt文件并排序
     doc_files = sorted(doc_dir.glob("*.txt"))
-
     if not doc_files:
         print(f"❌ 未找到任何文档文件 (.txt)")
         return documents
 
-    # 定义类别映射（根据文件名判断）
     category_mapping = {
-        "travel_standards": "差旅规定",
-        "reimbursement_policy": "报销规定",
-        "booking_guide": "预订指南",
-        "faq": "FAQ",
-        "emergency_procedures": "应急指南",
-        "platform_guide": "平台指南",
-        "city_specific_tips": "城市指南",
-        "environmental_initiatives": "环保倡议"
+        "announcement": "招录公告",
+        "teachers": "师资介绍",
+        "interview": "面试课程",
+        "province": "省考备考",
+        "center": "中央机关招录",
+        "course": "课程介绍",
     }
-
-    total_chunks = 0
 
     for file_path in doc_files:
         try:
-            # 从文件名提取编号作为doc_id (如: 01_travel_standards.txt -> doc_001)
             filename_parts = file_path.stem.split('_', 1)
-            if len(filename_parts) >= 2:
-                doc_num = filename_parts[0]
-                doc_key = filename_parts[1] if len(filename_parts) > 1 else ""
-            else:
-                doc_num = file_path.stem
-                doc_key = ""
-
+            doc_num = filename_parts[0]
+            doc_key = filename_parts[1] if len(filename_parts) > 1 else ""
             base_doc_id = f"doc_{doc_num}"
 
-            # 读取文件内容
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-
+            content = file_path.read_text(encoding="utf-8").strip()
             if not content:
                 print(f"   ⚠️  跳过空文件: {file_path.name}")
                 continue
 
-            # 提取标题（第一行）
-            lines = content.split('\n')
-            title = lines[0].strip() if lines else file_path.stem
-
-            # 根据文件名确定类别
-            category = "商旅知识"
+            category = "公考知识"
             for key, cat in category_mapping.items():
                 if key in doc_key:
                     category = cat
                     break
 
-            # --- 文档切分逻辑 ---
-            chunks = split_text(content, max_chars=600, overlap=100)
-            
-            for i, chunk_content in enumerate(chunks):
+            # 按 --- 分隔符拆分 chunk（preprocess_documents.py 生成的格式）
+            raw_chunks = [c.strip() for c in content.split("\n\n---\n\n") if c.strip()]
+
+            for i, chunk_content in enumerate(raw_chunks):
                 doc_id = f"{base_doc_id}_{i+1}"
-                
-                # 构建文档对象
-                document = {
+                # 取 chunk 第一行作为该片段标题
+                chunk_title = chunk_content.split("\n")[0].strip()
+                documents.append({
                     "id": doc_id,
                     "content": chunk_content,
                     "metadata": {
                         "category": category,
-                        "title": f"{title} (Part {i+1})",
-                        "source": "商旅知识库文档",
+                        "title": chunk_title,
+                        "source": "公考知识库文档",
                         "file_path": str(file_path),
-                        "version": "2024版",
+                        "version": "2026版",
                         "parent_doc": file_path.name
                     }
-                }
-                documents.append(document)
-            
-            total_chunks += len(chunks)
-            print(f"   ✓ 加载文档: {file_path.name} -> {len(chunks)} chunks")
+                })
+
+            print(f"   ✓ 加载文档: {file_path.name} -> {len(raw_chunks)} chunks")
 
         except Exception as e:
             print(f"   ❌ 加载文件失败 {file_path.name}: {e}")
@@ -180,6 +155,15 @@ def main():
     print("="*70)
     print("初始化RAG知识库 (Plugin Version) - With Chunking")
     print("="*70)
+    print()
+
+    # Step 0: 预处理原始文档
+    print("0. 预处理文档（按语义段落切分）...")
+    import importlib.util as _ilu
+    _pre_spec = _ilu.spec_from_file_location("preprocess", current_dir / "preprocess_documents.py")
+    _pre_mod = _ilu.module_from_spec(_pre_spec)
+    _pre_spec.loader.exec_module(_pre_mod)
+    _pre_mod.main()
     print()
 
     rag_agent = None
@@ -201,7 +185,7 @@ def main():
         # 定义路径
         skill_root = current_dir.parent
         knowledge_base_path = skill_root / "data" / "rag_knowledge"
-        documents_dir = skill_root / "data" / "documents"
+        documents_dir = skill_root / "data" / "documents_structured"
 
         # 确保目录存在
         knowledge_base_path.mkdir(parents=True, exist_ok=True)
@@ -213,7 +197,7 @@ def main():
             name="RAGKnowledgeAgent",
             model=model,
             knowledge_base_path=str(knowledge_base_path),
-            collection_name="business_travel_knowledge",
+            collection_name="mbot_knowledge",
             top_k=3
         )
 
@@ -277,9 +261,9 @@ def main():
         # 测试检索
         print("6. 测试知识检索...")
         test_queries = [
-            "出差住宿标准是多少？",
-            "航班延误了怎么办？",
-            "机票应该提前多久预订？"
+            "湖南省2026年公务员考试招录多少人？",
+            "考德上鲲鹏班适合什么样的考生？",
+            "面试课程有哪些内容？"
         ]
 
         for query in test_queries:

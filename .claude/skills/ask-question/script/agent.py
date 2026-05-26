@@ -58,7 +58,7 @@ class RAGKnowledgeAgent(AgentBase):
         name: str = "RAGKnowledgeAgent",
         model=None,
         knowledge_base_path: str = None,
-        collection_name: str = "business_travel_knowledge",
+        collection_name: str = "mbot_knowledge",
         embedding_model: str = "BAAI/bge-small-zh-v1.5",
         top_k: int = 3,
         **kwargs
@@ -325,6 +325,8 @@ class RAGKnowledgeAgent(AgentBase):
 
         # 检索相关知识
         retrieved_docs = self.search_knowledge(user_query)
+        for _doc in retrieved_docs:
+            logger.info(f"RAG hit: score={_doc['distance']:.3f} | {_doc['content'][:60]}")
 
         if not retrieved_docs:
             result = {
@@ -348,7 +350,7 @@ class RAGKnowledgeAgent(AgentBase):
             if not skill_instruction:
                 skill_instruction = "请基于知识库中的信息回答用户的问题。"
 
-            prompt = f"""你是一个商旅知识专家。请严格基于以下知识库中的信息回答用户的问题。
+            prompt = f"""你是考德上教育的智能客服，熟悉公务员考试（公考）培训相关知识。请严格基于以下知识库中的信息回答用户的问题。
 
 【用户问题】
 {user_query}
@@ -360,7 +362,7 @@ class RAGKnowledgeAgent(AgentBase):
 {skill_instruction}
 
 【重要约束】
-1. 如果【知识库信息】中没有包含回答用户问题所需的信息，请直接回答“抱歉，知识库中没有找到相关信息”，不要尝试根据你自己的知识编造答案。
+1. 如果【知识库信息】中没有包含回答用户问题所需的信息，请直接回答"抱歉，知识库中没有找到相关信息"，不要尝试根据你自己的知识编造答案。
 2. 即使问题很基础，如果知识库里没写，就说不知道。
 3. 请以专业、客观的语气回答。
 """
@@ -368,7 +370,7 @@ class RAGKnowledgeAgent(AgentBase):
             try:
                 # 调用LLM生成答案
                 messages = [
-                    {"role": "system", "content": "你是一个商旅知识专家。"},
+                    {"role": "system", "content": "你是考德上教育的智能客服，熟悉公务员考试培训相关知识。"},
                     {"role": "user", "content": prompt}
                 ]
                 response = await self.model(messages)
