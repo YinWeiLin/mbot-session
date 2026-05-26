@@ -1,15 +1,15 @@
 ---
 name: preference
-description: 当用户表达或更新个人偏好（如酒店品牌、航空公司、常住地、座位偏好）时使用此技能。触发词："我喜欢住汉庭"、"我还喜欢如家"、"我搬家到上海了"、"我常坐东航"。使用 PreferenceAgent，需传入 MemoryManager 持久化偏好；单独调用时需通过 memory_manager.long_term.save_preference() 手动写回。
+description: 当用户表达或更新个人偏好（如预算、备考阶段、报考岗位、所在城市）时使用此技能。触发词："我预算在1万以内"、"我是应届生"、"我想考省市岗"、"我在长沙"。使用 PreferenceAgent，需传入 MemoryManager 持久化偏好；单独调用时需通过 memory_manager.long_term.save_preference() 手动写回。
 ---
 
 # Preference (偏好管理)
 
-识别用户偏好并支持**追加**（还、也）与**覆盖**（搬家到、改成）。使用 **PreferenceAgent**。持久化由 **MemoryManager** 完成：在协调器流程中由协调器写回；单独调用时需根据返回的 `preferences` 列表自行调用 `memory_manager.long_term.save_preference()`。
+识别用户偏好并支持**追加**（还、也）与**覆盖**（改成、现在是）。使用 **PreferenceAgent**。持久化由 **MemoryManager** 完成：在协调器流程中由协调器写回；单独调用时需根据返回的 `preferences` 列表自行调用 `memory_manager.long_term.save_preference()`。
 
 ## When to Use
 
-- 用户说「我喜欢XX」「我还喜欢XX」「我搬家到XX」「我常坐东航」等
+- 用户说「我预算1万」「我是应届生」「我想考省市岗」「我搬到长沙了」等
 
 ## Agent
 
@@ -90,14 +90,12 @@ data = asyncio.run(save_preference("我还喜欢如家"))
    - 如果当前偏好中没有这个字段，默认使用 replace
 
 【常见偏好类型】
-- home_location: 家庭地址/常住地
-- hotel_brands: 酒店品牌偏好
-- airlines: 航空公司偏好
-- seat_preference: 座位偏好
-- meal_preference: 餐食偏好
-- budget_level: 预算等级
-- transportation_preference: 交通偏好
-- food_preference: 美食偏好
+- budget: 预算范围（如"1万以内"、"2万左右"）
+- exam_type: 报考类型（如"省考"、"国考"、"选调生"）
+- target_position: 目标岗位（如"省市岗"、"县乡岗"、"执法岗"）
+- study_status: 备考状态（如"应届生"、"在职备考"、"全职备考"）
+- location: 所在城市/省份
+- course_preference: 课程偏好（如"面试课"、"笔试课"、"封闭集训"）
 （支持自定义新的偏好类型）
 
 【输出格式】(严格JSON)

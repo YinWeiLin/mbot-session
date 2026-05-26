@@ -24,8 +24,7 @@ logger = logging.getLogger(__name__)
 AGENT_DISPLAY_NAMES = {
     "event_collection": "事项收集",
     "preference": "偏好管理",
-    "itinerary_planning": "行程规划",
-    "information_query": "信息查询",
+"information_query": "信息查询",
     "rag_knowledge": "知识库查询",
     "memory_query": "记忆查询",
 }
@@ -308,22 +307,6 @@ class MbotSession:
                 text = f"{text}\n参考来源：{urls}" if text else f"参考来源：{urls}"
             return text
 
-        if agent_name == "itinerary_planning":
-            itinerary = data.get("itinerary") or (data.get("data", {}) or {}).get("itinerary")
-            if not itinerary:
-                return ""
-            lines = [f"{itinerary.get('title', '行程规划')}（{itinerary.get('duration', '')}）"]
-            for day in itinerary.get("daily_plans", []):
-                lines.append(f"第 {day.get('day', 1)} 天")
-                for slot in (day.get("activities") or day.get("time_slots") or []):
-                    line = f"  {slot.get('time', '')} - {slot.get('activity') or slot.get('location', '')}"
-                    if slot.get("description"):
-                        line += f"：{slot['description']}"
-                    lines.append(line)
-            if itinerary.get("notes"):
-                lines.append("注意事项：" + "；".join(itinerary["notes"]))
-            return "\n".join(lines)
-
         if agent_name == "preference":
             raw = data.get("preferences") or (data.get("data", {}) or {}).get("preferences")
             prefs_list = raw.get("preferences", []) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
@@ -340,27 +323,13 @@ class MbotSession:
             for p in prefs_list:
                 action = "追加" if p.get("action") == "append" else "设置为"
                 lines.append(f"  {type_names.get(p.get('type',''), p.get('type',''))} {action} {p.get('value','')}")
-            if not any(r.get("agent_name") == "itinerary_planning" for r in all_results):
+            if not any(r.get("agent_name") == "rag_knowledge" for r in all_results):
                 lines.append("下次规划时会参考这些偏好。")
             return "\n".join(lines)
 
         if agent_name == "event_collection":
-            d = data.get("data", {}) if isinstance(data.get("data"), dict) else {}
-            origin = data.get("origin") or d.get("origin")
-            destination = data.get("destination") or d.get("destination")
-            start_date = data.get("start_date") or d.get("start_date")
-            end_date = data.get("end_date") or d.get("end_date")
-            missing = data.get("missing_info") or d.get("missing_info") or []
-            parts = []
-            if not any(r.get("agent_name") == "itinerary_planning" for r in all_results) and (origin or destination):
-                info = [f"出发地：{origin}"] if origin else []
-                if destination: info.append(f"目的地：{destination}")
-                if start_date: info.append(f"出发日期：{start_date}")
-                if end_date: info.append(f"返程日期：{end_date}")
-                parts.append("已收集行程信息：" + "，".join(info))
-            if missing:
-                parts.append(f"还需要补充：{', '.join(missing)}")
-            return "\n".join(parts)
+            follow_up = data.get("follow_up_question") or (data.get("data", {}) or {}).get("follow_up_question")
+            return follow_up or ""
 
         if agent_name == "need_stimulation":
             return data.get("engage_text", "")

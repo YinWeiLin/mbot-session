@@ -61,7 +61,7 @@ data = asyncio.run(query_info("北京明天天气怎么样？"))
 
 ## 注意
 
-- 本 Agent **不**处理「差旅标准」「申请单状态」「历史行程」等；差旅标准请用 **ask-question**（RAG），历史行程请用 **memory-query**。
+- 本 Agent **不**处理「课程介绍」「套餐价格」「历史咨询」等；课程/产品问题请用 **ask-question**（RAG），历史咨询请用 **memory-query**。
 - 网络搜索依赖：`pip install ddgs`（或 `duckduckgo-search`）。
 
 

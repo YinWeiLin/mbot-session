@@ -1,10 +1,11 @@
 """
-事项收集智能体
-职责：收集用户的出发地/事项地点/事项时间/返程地
+需求澄清智能体 NeedClarificationAgent
+职责：在 LOOKING 阶段主动收集用户关键备考信息，每次只追问一个最关键的缺失字段
 
 核心功能：
-- 提取出发地、目的地、时间、返程地等基础信息
-- 识别缺失信息并提示
+- 从用户输入中提取备考相关结构化信息
+- 识别缺失的关键字段，生成一个自然口语化的追问
+- 信息齐全时 follow_up_question 为 null，调度器据此决定是否跳过 RAG
 """
 from agentscope.agent import AgentBase
 from agentscope.message import Msg
@@ -15,7 +16,6 @@ import logging
 import sys
 import os
 
-# Add project root to sys.path
 _pr = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 sys.path.insert(0, _pr)
 sys.path.insert(0, os.path.join(_pr, 'src'))
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class EventCollectionAgent(AgentBase):
-    """事项收集智能体"""
+    """需求澄清智能体（复用 event-collection skill 槽位）"""
 
     def __init__(self, name: str = "EventCollectionAgent", model=None, **kwargs):
         super().__init__()
@@ -33,128 +33,100 @@ class EventCollectionAgent(AgentBase):
 
     async def reply(self, x: Optional[Union[Msg, List[Msg]]] = None) -> Msg:
         if x is None:
-            return Msg(name=self.name, content={}, role="assistant")
+            return Msg(name=self.name, content=json.dumps({}), role="assistant")
 
-        # 解析输入内容
         content = x.content if not isinstance(x, list) else x[-1].content
 
-        # 如果content是JSON字符串，解析它
+        user_query = content
+        known_info = {}
         if isinstance(content, str):
             try:
                 data = json.loads(content)
                 context = data.get("context", {})
                 user_query = context.get("rewritten_query", "") or str(data)
-                user_preferences = context.get("user_preferences", {})
+                known_info = context.get("user_preferences", {})
             except json.JSONDecodeError:
-                user_query = content
-                user_preferences = {}
-        else:
-            user_query = str(content)
-            user_preferences = {}
+                pass
 
-        # 构建用户背景信息
-        background_info = ""
-        if user_preferences:
-            bg_parts = ["【用户背景信息】（可用于推断缺失信息）"]
-            if user_preferences.get("home_location"):
-                bg_parts.append(f"• 家庭住址: {user_preferences['home_location']}")
-            if user_preferences.get("hotel_brands"):
-                bg_parts.append(f"• 酒店偏好: {', '.join(user_preferences['hotel_brands'])}")
-            if user_preferences.get("airlines"):
-                bg_parts.append(f"• 航空偏好: {', '.join(user_preferences['airlines'])}")
+        # 把已知偏好格式化给 LLM，避免重复追问
+        field_labels = {
+            "exam_type": "考试类型",
+            "target_position": "目标岗位",
+            "study_status": "备考状态",
+            "exam_stage": "当前阶段",
+            "budget": "预算范围",
+            "location": "所在城市",
+        }
+        known_parts = [
+            f"• {label}: {known_info[k]}"
+            for k, label in field_labels.items()
+            if known_info.get(k)
+        ]
+        known_section = ("【已知用户信息】\n" + "\n".join(known_parts) + "\n\n") if known_parts else ""
 
-            if len(bg_parts) > 1:
-                background_info = "\n".join(bg_parts) + "\n\n"
+        prompt = f"""你是考德上教育的智能客服，负责了解用户备考需求以便推荐合适的课程。
 
-        # 获取当前时间
-        from datetime import datetime
-        current_date = datetime.now().strftime("%Y年%m月%d日")
-        weekday = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"][datetime.now().weekday()]
-
-        prompt = f"""你是事项收集专家，负责提取旅行的基础信息。
-
-【当前时间】
-{current_date} {weekday}
-
-{background_info}【用户输入】
+{known_section}【用户输入】
 {user_query}
 
-【提取要求】
-请尽可能提取以下信息：
-1. origin - 出发地
-2. destination - 目的地
-3. start_date - 出发日期（YYYY-MM-DD格式）
-4. end_date - 返程日期
-5. duration_days - 行程天数
-6. return_location - 返程地
-7. trip_purpose - 行程目的
+【提取任务】
+请从用户输入中尽可能提取以下字段（未提及的设为 null）：
+1. exam_type - 考试类型（省考 / 国考 / 选调生 / 事业单位 / 其他）
+2. target_position - 目标岗位（省市岗 / 县乡岗 / 执法岗 / 烟草岗 / 公安岗 / 其他）
+3. study_status - 备考状态（应届生 / 在职备考 / 全职备考 / 二战及以上）
+4. exam_stage - 当前阶段（备考笔试 / 已过笔试备考面试 / 待定）
+5. budget - 预算范围（如"1万以内" / "2万左右" / "不限"）
+6. location - 所在城市/省份
 
-【日期处理规则】（重要）
-- 当前时间是{current_date}
-- 用户说"2月27日"或"2.27"等相对时间，请根据当前时间推断完整日期（年月日）
-- 用户说"明天"、"后天"、"下周"等相对时间，请根据当前时间计算具体日期
-- 所有日期必须输出完整的YYYY-MM-DD格式
+【追问规则】
+- 只在以下关键字段缺失时生成 follow_up_question，优先级依次为：
+  exam_stage → exam_type → study_status → budget
+- 每次只追问一个，问题要自然口语化，不超过 20 字
+- 已知字段不追问
+- 若关键字段都已知，follow_up_question 设为 null
 
-【特殊处理】
-- 对于"北京一日游"这类：destination和origin都设为北京
-- 对于"一日游"：duration_days设为1
-- 如果用户没说出发地，但有家庭住址信息，可推断出发地为家庭住址
-
-【输出格式】(严格JSON)
+【输出格式】(严格JSON，无其他文字)
 {{
-    "origin": "北京",
-    "destination": "北京",
-    "start_date": "2026-02-27",
-    "end_date": "2026-02-27",
-    "duration_days": 1,
-    "return_location": "北京",
-    "trip_purpose": "旅游",
-    "missing_info": [],
-    "extracted_count": 7,
-    "summary": "北京一日游，2月27日"
+    "exam_type": null,
+    "target_position": null,
+    "study_status": null,
+    "exam_stage": null,
+    "budget": null,
+    "location": null,
+    "extracted_count": 0,
+    "follow_up_question": "请问您目前是备考笔试还是准备面试呢？"
 }}
-
-缺失的信息在missing_info中列出，对应字段设为null。
 """
 
         try:
-            # 调用模型
-            response = await self.model([
-                {"role": "user", "content": prompt}
-            ])
+            response = await self.model([{"role": "user", "content": prompt}])
             text = await parse_llm_response(response)
 
-            # 清理文本，移除markdown代码块标记
             text = text.strip()
-            if text.startswith('```json'):
+            if text.startswith("```json"):
                 text = text[7:]
-            if text.startswith('```'):
+            if text.startswith("```"):
                 text = text[3:]
-            if text.endswith('```'):
+            if text.endswith("```"):
                 text = text[:-3]
             text = text.strip()
 
-            # 提取JSON
-            start_idx = text.find('{')
-            end_idx = text.rfind('}')
-
+            start_idx = text.find("{")
+            end_idx = text.rfind("}")
             if start_idx != -1 and end_idx != -1:
-                json_str = text[start_idx:end_idx+1]
-                try:
-                    result = json.loads(json_str)
-                except json.JSONDecodeError as e:
-                    # 记录详细错误信息用于调试
-                    logger.error(f"JSON parse failed. Text sample: {json_str[:100]}")
-                    raise ValueError(f"Failed to parse JSON. Error: {e}")
+                result = json.loads(text[start_idx:end_idx + 1])
             else:
                 raise ValueError("No JSON found in response")
+
         except Exception as e:
-            logger.error(f"Event collection failed: {e}")
+            logger.error(f"Need clarification failed: {e}")
             result = {
-                "missing_info": ["所有信息"],
-                "extracted_count": 0,
-                "error": str(e)
+                "exam_type": None, "target_position": None,
+                "study_status": None, "exam_stage": None,
+                "budget": None, "location": None,
+                "extracted_count": 0, "follow_up_question": None,
+                "error": str(e),
             }
 
-        # 返回JSON字符串格式
+        logger.info(f"需求澄清: extracted={result.get('extracted_count', 0)}, follow_up={result.get('follow_up_question')}")
         return Msg(name=self.name, content=json.dumps(result, ensure_ascii=False), role="assistant")

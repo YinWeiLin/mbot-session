@@ -1,16 +1,16 @@
 ---
 name: ask-question
-description: 当用户询问差旅政策、报销标准、预订流程、城市指南等差旅相关问题时使用此技能。触发词："XX标准是多少"、"如何XX"、"XX怎么办"，以及各类问句。使用 RAGKnowledgeAgent 从本地知识库检索并生成答案。
+description: 当用户询问公考培训课程、套餐价格、师资介绍、省考/国考公告等商家知识库相关问题时使用此技能。触发词：”XX课程是什么”、”多少钱”、”XX老师”、”省考怎么考”，以及各类问句。使用 RAGKnowledgeAgent 从本地知识库检索并生成答案。
 ---
 
-# Ask Travel Question (RAG 知识库问答)
+# Ask Question (RAG 知识库问答)
 
-回答用户关于差旅政策、报销、预订、城市指南等的问题，使用 **RAGKnowledgeAgent** 从本地知识库检索并生成答案。
+回答用户关于公考培训课程、套餐价格、师资介绍、省考/国考流程等问题，使用 **RAGKnowledgeAgent** 从本地知识库检索并生成答案。
 
 ## When to Use
 
-- 用户问「XX标准是多少」「如何报销」「航班延误怎么办」等
-- 需要基于企业/项目知识文档回答时
+- 用户问「XX课程有哪些」「鲲鹏班多少钱」「面试怎么备考」「省考流程是什么」等
+- 需要基于商家知识文档回答时
 
 ## Agent
 
@@ -32,34 +32,34 @@ import json
 async def ask_question(user_query: str):
     init_agentscope()
     model = OpenAIChatModel(
-        model_name=LLM_CONFIG["model_name"],
-        api_key=LLM_CONFIG["api_key"],
-        client_kwargs={"base_url": LLM_CONFIG["base_url"], "timeout": 60},
-        temperature=LLM_CONFIG.get("temperature", 0.7),
-        max_tokens=LLM_CONFIG.get("max_tokens", 2000),
+        model_name=LLM_CONFIG[“model_name”],
+        api_key=LLM_CONFIG[“api_key”],
+        client_kwargs={“base_url”: LLM_CONFIG[“base_url”], “timeout”: 60},
+        temperature=LLM_CONFIG.get(“temperature”, 0.7),
+        max_tokens=LLM_CONFIG.get(“max_tokens”, 2000),
     )
     # 嵌入模型路径从 config.RAG_CONFIG 读取，默认 data/models/bge-small-zh-v1.5
     rag_agent = RAGKnowledgeAgent(
-        name="RAGKnowledgeAgent",
+        name=”RAGKnowledgeAgent”,
         model=model,
-        knowledge_base_path="./data/rag_knowledge",
-        collection_name="business_travel_knowledge",
+        knowledge_base_path=”./data/rag_knowledge”,
+        collection_name=”mbot_knowledge”,
         top_k=3,
     )
-    if not getattr(rag_agent, "initialized", True):
-        return {"error": "RAG 未初始化，请先运行 python scripts/init_knowledge_base.py"}
-    user_msg = Msg(name="user", content=user_query, role="user")
+    if not getattr(rag_agent, “initialized”, True):
+        return {“error”: “RAG 未初始化，请先运行 python scripts/init_knowledge_base.py”}
+    user_msg = Msg(name=”user”, content=user_query, role=”user”)
     result = await rag_agent.reply(user_msg)
     return json.loads(result.content) if isinstance(result.content, str) else result.content
 
 # 使用
-data = asyncio.run(ask_question("北京的住宿标准是多少？"))
-# data: {"status": "success"|"no_knowledge", "answer": "...", "retrieved_documents": [...], "query": "..."}
+data = asyncio.run(ask_question(“鲲鹏班有哪些师资？”))
+# data: {“status”: “success”|”no_knowledge”, “answer”: “...”, “retrieved_documents”: [...], “query”: “...”}
 ```
 
 ## 返回格式
 
-- `status`: `"success"` 或 `"no_knowledge"`
+- `status`: `”success”` 或 `”no_knowledge”`
 - `answer`: 自然语言答案
 - `retrieved_documents`: 列表，每项含 `content`, `metadata`
 - `query`: 用户问题
@@ -67,7 +67,7 @@ data = asyncio.run(ask_question("北京的住宿标准是多少？"))
 ## 知识库
 
 - 路径：`data/rag_knowledge/`（Milvus Lite）
-- 源文档：`data/documents/`，共 8 类（差旅标准、报销、预订、FAQ、紧急处理、平台指南、城市指南、环保）
+- 源文档：`data/documents/`，共 7 类（湖南公告、国考公告、江西公告、师资介绍、笔试课程、面试课程、省考指南、套餐价格）
 - 首次使用前需执行：`python scripts/init_knowledge_base.py`
 
 
@@ -75,7 +75,7 @@ data = asyncio.run(ask_question("北京的住宿标准是多少？"))
 
 【回答要求】
 1. 必须严格基于知识库中的信息进行回答，严禁编造。
-2. 如果检索到的知识库信息与问题无关，或者信息不足以回答问题，请直接回答“知识库中没有相关信息”。
+2. 如果检索到的知识库信息与问题无关，或者信息不足以回答问题，请直接回答”知识库中没有相关信息”。
 3. 回答要准确、简洁、有条理。
 4. 如果有多个相关信息，可以分点说明。
 

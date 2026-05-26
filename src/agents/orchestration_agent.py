@@ -32,7 +32,6 @@ class OrchestrationAgent(AgentBase):
         name: str = "OrchestrationAgent",
         agent_registry: Dict[str, AgentBase] = None,
         memory_manager = None,
-        **kwargs
     ):
         """
         初始化协调器
@@ -116,6 +115,47 @@ class OrchestrationAgent(AgentBase):
                 "expected_output": "engage_text"
             })
 
+        try:
+            stage = SessionStage[intention_data.get("session_stage", "looking").upper()]
+        except KeyError:
+            stage = SessionStage.LOOKING
+
+        # 判断是否有具体意图（有则走 RAG，无则跳过 RAG 只追问）
+        EXPLICIT_INTENTS = {"price_inquiry", "product_inquiry", "comparison", "purchase_intent"}
+        intents = intention_data.get("intents", [])
+        has_explicit_intent = any(
+            i.get("type") in EXPLICIT_INTENTS for i in intents if isinstance(i, dict)
+        )
+
+        # 需求澄清：LOOKING / CONSIDERING 阶段运行，ACTING 阶段跳过
+        clarif_result = None
+        if stage in (SessionStage.LOOKING, SessionStage.CONSIDERING):
+            context = self._prepare_context(intention_data)
+            clarif_result = await self._execute_agent(
+                "event_collection", context, "需求澄清", "follow_up_question", []
+            )
+            if clarif_result.get("status") != "error":
+                clarif_data = clarif_result.get("data", {})
+                # 提取到的字段写入用户偏好
+                if self.memory_manager:
+                    for field in ("exam_type", "target_position", "study_status", "exam_stage", "budget", "location"):
+                        val = clarif_data.get(field)
+                        if val:
+                            self.memory_manager.long_term.save_preference(field, val)
+                follow_up = clarif_data.get("follow_up_question")
+                if follow_up and not has_explicit_intent:
+                    # 无具体意图 + 有追问 → 只输出追问，跳过所有其他 Agent
+                    logger.info(f"无具体意图，需求澄清短路: {follow_up}")
+                    wrapped = {"agent_name": "event_collection", "priority": 0, "result": clarif_result}
+                    final_result = self._aggregate_results([wrapped], intention_data)
+                    return Msg(
+                        name=self.name,
+                        content=json.dumps(final_result, ensure_ascii=False),
+                        role="assistant"
+                    )
+                # 有具体意图 + 有追问 → 继续走 RAG，追问会在 _aggregate_results 后附上
+                # 无追问（信息齐了）→ 继续走 RAG，不追问
+
         sorted_schedule = sorted(agent_schedule, key=lambda x: x.get("priority", 999))
 
         logger.info(f"开始协调调度 {len(sorted_schedule)} 个智能体")
@@ -147,12 +187,20 @@ class OrchestrationAgent(AgentBase):
             batch_results = await self._execute_parallel_agents(parallel_tasks, context, results)
             results.extend(batch_results)
 
-        # 聚合结果
+        # 聚合结果；若有澄清追问（有具体意图时），追加到 results 末尾
+        if clarif_result and clarif_result.get("status") != "error":
+            follow_up = clarif_result.get("data", {}).get("follow_up_question")
+            if follow_up:
+                results.append({
+                    "agent_name": "event_collection",
+                    "priority": 998,
+                    "result": clarif_result,
+                })
         final_result = self._aggregate_results(results, intention_data)
 
         # 更新记忆
         if self.memory_manager:
-            self._update_memory(intention_data, results)
+            self._update_memory(results)
 
         return Msg(
             name=self.name,
@@ -403,14 +451,7 @@ class OrchestrationAgent(AgentBase):
 
         return aggregated
 
-    def _update_memory(self, intention_data: Dict[str, Any], results: List[Dict]):
-        """
-        更新记忆系统
-
-        Args:
-            intention_data: 意图识别结果
-            results: 智能体执行结果
-        """
+    def _update_memory(self, results: List[Dict]):
         if not self.memory_manager:
             return
 
@@ -464,37 +505,6 @@ class OrchestrationAgent(AgentBase):
                         if value and pref_type != "has_preferences" and pref_type != "error":
                             self.memory_manager.long_term.save_preference(pref_type, value)
                             logger.info(f"Updated {pref_type}: {value} (legacy format)")
-
-            # 如果是行程规划智能体，保存行程到长期记忆
-            if agent_name == "itinerary_planning" and isinstance(data, dict):
-                itinerary = data.get("itinerary", {})
-
-                # 只要有行程信息就保存（不管是否完全规划好）
-                if itinerary:
-                    # 提取事项收集的信息（出发地、目的地等）
-                    event_data = {}
-                    for r in results:
-                        if r["agent_name"] == "event_collection":
-                            event_data = r["result"].get("data", {})
-                            break
-
-                    # 从 event_data 获取行程信息
-                    origin = event_data.get("origin")
-                    destination = event_data.get("destination")
-                    start_date = event_data.get("start_date")
-                    end_date = event_data.get("end_date")
-                    purpose = event_data.get("trip_purpose", "旅游")
-
-                    # 保存到长期记忆（只要有目的地就保存）
-                    if destination:
-                        self.memory_manager.long_term.save_trip_history({
-                            "origin": origin,
-                            "destination": destination,
-                            "start_date": start_date,
-                            "end_date": end_date,
-                            "purpose": purpose
-                        })
-                        logger.info(f"行程已保存至长期记忆: {origin} -> {destination}")
 
         logger.info("记忆系统已更新")
 

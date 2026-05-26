@@ -1,11 +1,11 @@
 ---
 name: memory-query
-description: 当用户询问自己的历史行程、过往出行记录或已保存的偏好时使用此技能。触发词："我去过哪些地方"、"我上次去北京是什么时候"、"我之前说过什么偏好"、"我的旅行记录"。使用 MemoryQueryAgent，需传入 MemoryManager（user_id、session_id）以访问长期记忆。
+description: 当用户询问自己的历史咨询记录、过往对话内容或已保存的偏好时使用此技能。触发词："我上次问过什么"、"我之前说过什么偏好"、"我的咨询记录"。使用 MemoryQueryAgent，需传入 MemoryManager（user_id、session_id）以访问长期记忆。
 ---
 
 # Memory Query (记忆查询)
 
-基于用户**长期记忆**回答「我去过哪」「上次什么时候」「我的偏好」等问题，使用 **MemoryQueryAgent**。需传入 **MemoryManager** 以访问 `data/memory/{user_id}.json` 中的行程、偏好与聊天摘要。
+基于用户**长期记忆**回答「我上次问过什么」「我的偏好」等问题，使用 **MemoryQueryAgent**。需传入 **MemoryManager** 以访问 `data/memory/{user_id}.json` 中的咨询记录、偏好与聊天摘要。
 
 ## When to Use
 
