@@ -265,12 +265,12 @@ class MbotSession:
             if status != "success" and not (agent_name == "rag_knowledge" and status == "no_knowledge"):
                 continue
 
-            text = self._extract_agent_text(agent_name, data, results)
+            text = self._extract_agent_text(agent_name, data)
             lines.append(text if text else f"{AGENT_DISPLAY_NAMES.get(agent_name, agent_name)}已完成")
 
         return "\n".join(lines) if lines else "已处理您的请求。"
 
-    def _extract_agent_text(self, agent_name: str, data: dict, all_results: list) -> str:
+    def _extract_agent_text(self, agent_name: str, data: dict) -> str:
         """从单个 Agent 的 data 中提取纯文本"""
         def nested(d, *keys):
             """从 data 或 data.data 中依次尝试多个 key"""
@@ -306,26 +306,6 @@ class MbotSession:
                 urls = ", ".join((s.get("url", "") if isinstance(s, dict) else str(s)) for s in sources[:3])
                 text = f"{text}\n参考来源：{urls}" if text else f"参考来源：{urls}"
             return text
-
-        if agent_name == "preference":
-            raw = data.get("preferences") or (data.get("data", {}) or {}).get("preferences")
-            prefs_list = raw.get("preferences", []) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
-            if not prefs_list:
-                err = data.get("error", "")
-                return f"偏好未保存: {err}" if err else ""
-            type_names = {
-                "home_location": "常驻地", "transportation_preference": "交通偏好",
-                "hotel_brands": "酒店偏好", "airlines": "航空公司偏好",
-                "seat_preference": "座位偏好", "meal_preference": "餐食偏好",
-                "budget_level": "预算等级",
-            }
-            lines = ["已更新偏好设置："]
-            for p in prefs_list:
-                action = "追加" if p.get("action") == "append" else "设置为"
-                lines.append(f"  {type_names.get(p.get('type',''), p.get('type',''))} {action} {p.get('value','')}")
-            if not any(r.get("agent_name") == "rag_knowledge" for r in all_results):
-                lines.append("下次规划时会参考这些偏好。")
-            return "\n".join(lines)
 
         if agent_name == "event_collection":
             follow_up = data.get("follow_up_question") or (data.get("data", {}) or {}).get("follow_up_question")

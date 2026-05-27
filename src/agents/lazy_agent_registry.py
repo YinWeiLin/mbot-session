@@ -46,7 +46,6 @@ class LazyAgentRegistry:
         self._legacy_mapping = {
             "rag_knowledge": "ask-question",
             "memory_query": "memory-query",
-            "preference": "preference",
             "information_query": "query-info",
 "event_collection": "event-collection",
             "need_stimulation": "need-stimulation",
