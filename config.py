@@ -21,9 +21,12 @@ SYSTEM_CONFIG = {
     "timeout": 60,  # Increased timeout for better stability
 }
 
-# RAG 知识库：嵌入模型（本地路径，无需连 HuggingFace）
+# RAG 知识库：嵌入模型（硅基流动 API）
 RAG_CONFIG = {
-    "embedding_model": "data/models/bge-small-zh-v1.5",
+    "embedding_model": "BAAI/bge-large-zh-v1.5",
+    "embedding_api_url": "https://api.siliconflow.cn/v1/embeddings",
+    "embedding_api_key": os.environ.get("SILICONFLOW_API_KEY", ""),
+    "embedding_dim": 1024,
 }
 
 # 连接与可用性：重试、熔断、健康检查

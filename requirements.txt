@@ -7,9 +7,11 @@ agentscope==1.0.16
 # LLM 调用
 requests==2.32.3
 
-# RAG 与向量库（pymilvus[milvus_lite] 用于本地 .db 连接）
+# RAG 与向量库
 pymilvus[milvus_lite]==2.6.9
-sentence-transformers==5.2.3
+
+# HTTP 客户端（embedding API 调用）
+httpx==0.28.1
 
 # CLI 界面
 rich==13.9.4

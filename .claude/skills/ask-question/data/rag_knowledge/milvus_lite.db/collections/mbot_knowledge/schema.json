@@ -17,7 +17,7 @@
     {
       "auto_id": false,
       "default_value": null,
-      "dim": 512,
+      "dim": 1024,
       "dtype": "float_vector",
       "element_type": null,
       "is_primary": false,
