@@ -15,7 +15,10 @@ data/memory/
 
 # 开发工具
 .git/
-.claude/
+.claude/CLAUDE.md
+.claude/claudian-settings.json
+.claude/plans/
+.claude/worktrees/
 .vscode/
 *.md
 
