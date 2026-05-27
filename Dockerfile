@@ -11,6 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 下载 embedding 模型（放在 COPY 代码之前，模型不变时走缓存不重新下载）
+RUN python -c "\
+from huggingface_hub import snapshot_download; \
+snapshot_download('BAAI/bge-small-zh-v1.5', local_dir='data/models/bge-small-zh-v1.5')"
+
 # 复制项目代码
 COPY . .
 
