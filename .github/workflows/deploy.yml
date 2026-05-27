@@ -7,26 +7,23 @@ on:
     workflow_dispatch:
 
 env:
-    REGISTRY: ghcr.io
-    IMAGE_NAME: ghcr.io/yinweilin/mbot
+    ALIYUN_REGISTRY: crpi-o7hjr2799ziyel6t.cn-beijing.personal.cr.aliyuncs.com
+    IMAGE_NAME: crpi-o7hjr2799ziyel6t.cn-beijing.personal.cr.aliyuncs.com/mbot_ssid/mbot-session
 
 jobs:
     build-and-push:
         runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            packages: write
 
         steps:
             - name: 检出代码
               uses: actions/checkout@v4
 
-            - name: 登录 GitHub Container Registry
+            - name: 登录阿里云容器镜像服务
               uses: docker/login-action@v3
               with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+                  registry: ${{ env.ALIYUN_REGISTRY }}
+                  username: ${{ secrets.ALIYUN_REGISTRY_USER }}
+                  password: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
 
             - name: 构建并推送镜像
               uses: docker/build-push-action@v5
@@ -49,13 +46,13 @@ jobs:
                   port: ${{ secrets.SERVER_PORT }}
                   command_timeout: 20m
                   script: |
-                      # 登录 ghcr.io
-                      echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+                      # 登录阿里云镜像服务
+                      echo ${{ secrets.ALIYUN_REGISTRY_PASSWORD }} | docker login crpi-o7hjr2799ziyel6t.cn-beijing.personal.cr.aliyuncs.com -u ${{ secrets.ALIYUN_REGISTRY_USER }} --password-stdin
 
-                      # 拉取最新镜像
-                      docker pull ghcr.io/yinweilin/mbot:latest
+                      # 拉取最新镜像（国内网络，速度快）
+                      docker pull crpi-o7hjr2799ziyel6t.cn-beijing.personal.cr.aliyuncs.com/mbot_ssid/mbot-session:latest
 
-                      # 停止并删除旧容器（首次部署时不存在，|| true 避免报错）
+                      # 停止并删除旧容器
                       docker stop mbot || true
                       docker rm mbot || true
 
@@ -67,7 +64,8 @@ jobs:
                         -e LLM_API_KEY=${{ secrets.LLM_API_KEY }} \
                         -v /home/${{ secrets.SERVER_USER }}/mbot-data/memory:/app/data/memory \
                         -v /home/${{ secrets.SERVER_USER }}/mbot-data/logs:/app/data/logs \
-                        ghcr.io/yinweilin/mbot:latest
+                        crpi-o7hjr2799ziyel6t.cn-beijing.personal.cr.aliyuncs.com/mbot_ssid/mbot-session:latest
 
-                      # 清理旧镜像，释放磁盘空间
+                      # 清理旧镜像
                       docker image prune -f
+
