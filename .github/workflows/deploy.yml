@@ -1,0 +1,72 @@
+name: Build and Deploy mbot
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ghcr.io/yinweilin/mbot
+
+jobs:
+    build-and-push:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+
+        steps:
+            - name: 检出代码
+              uses: actions/checkout@v4
+
+            - name: 登录 GitHub Container Registry
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: 构建并推送镜像
+              uses: docker/build-push-action@v5
+              with:
+                  context: .
+                  push: true
+                  tags: ${{ env.IMAGE_NAME }}:latest
+
+    deploy:
+        runs-on: ubuntu-latest
+        needs: build-and-push
+
+        steps:
+            - name: SSH 到服务器部署
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.SERVER_HOST }}
+                  username: ${{ secrets.SERVER_USER }}
+                  key: ${{ secrets.SERVER_SSH_KEY }}
+                  port: ${{ secrets.SERVER_PORT }}
+                  script: |
+                      # 登录 ghcr.io
+                      echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+                      # 拉取最新镜像
+                      docker pull ghcr.io/yinweilin/mbot:latest
+
+                      # 停止并删除旧容器（首次部署时不存在，|| true 避免报错）
+                      docker stop mbot || true
+                      docker rm mbot || true
+
+                      # 启动新容器
+                      docker run -d \
+                        --name mbot \
+                        --restart unless-stopped \
+                        -p 8000:8000 \
+                        -e LLM_API_KEY=${{ secrets.LLM_API_KEY }} \
+                        -v /home/${{ secrets.SERVER_USER }}/mbot-data/memory:/app/data/memory \
+                        -v /home/${{ secrets.SERVER_USER }}/mbot-data/logs:/app/data/logs \
+                        ghcr.io/yinweilin/mbot:latest
+
+                      # 清理旧镜像，释放磁盘空间
+                      docker image prune -f

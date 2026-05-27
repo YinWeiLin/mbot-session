@@ -22,7 +22,7 @@ data/preferences/*.json
 !data/preferences/.gitkeep
 data/memory/*.json
 data/models/
-**/rag_knowledge/
+data/logs/
 **/documents_trip/
 **/documents_structured/
 
