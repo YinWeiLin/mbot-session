@@ -40,21 +40,17 @@ class CliRunner:
         table.add_row("status", "查看当前状态和记忆")
         table.add_row("health", "检查 LLM 服务是否可用")
         table.add_row("clear", "清空短期记忆（保留长期记忆）")
-        table.add_row("history", "查看历史行程")
         table.add_row("preferences", "查看用户偏好")
         table.add_row("exit", "退出程序")
         self.console.print(table)
 
     def _show_status(self):
-        full_context = self.session.memory_manager.get_full_context()
-        st = full_context["short_term"]["statistics"]
-        lt = full_context["long_term"]["statistics"]
+        st = self.session.memory_manager.short_term.get_statistics()
 
         table = Table(title="记忆状态", show_header=True, header_style="bold magenta")
         table.add_column("类型", style="cyan")
         table.add_column("状态", style="white")
         table.add_row("短期记忆", f"{st['total_messages']} 条消息")
-        table.add_row("长期记忆", f"{lt['total_trips']} 次行程")
         table.add_row("已加载智能体", f"{len(self.session._agent_cache)} 个")
         self.console.print(table)
         self.console.print()
@@ -77,25 +73,6 @@ class CliRunner:
                 dtable.add_row(role, content, ts)
             self.console.print(dtable)
             self.console.print()
-
-    def _show_history(self):
-        history = self.session.memory_manager.long_term.get_trip_history(10)
-        if not history:
-            self.console.print("暂无历史行程", style="yellow")
-            return
-        table = Table(title="历史行程", show_header=True, header_style="bold magenta")
-        table.add_column("ID", style="cyan")
-        table.add_column("出发地", style="white")
-        table.add_column("目的地", style="white")
-        table.add_column("日期", style="white")
-        table.add_column("目的", style="white")
-        for trip in history:
-            table.add_row(
-                trip.get("trip_id", ""), trip.get("origin", ""),
-                trip.get("destination", ""), trip.get("start_date", ""),
-                trip.get("purpose", ""),
-            )
-        self.console.print(table)
 
     def _show_preferences(self):
         prefs = self.session.memory_manager.long_term.get_preference()
@@ -159,8 +136,6 @@ class CliRunner:
                 elif cmd == "clear":
                     self.session.memory_manager.short_term.clear()
                     self.console.print("✓ 已清空短期记忆", style="green")
-                elif cmd == "history":
-                    self._show_history()
                 elif cmd == "preferences":
                     self._show_preferences()
                 else:

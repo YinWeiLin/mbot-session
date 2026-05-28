@@ -47,7 +47,7 @@ class LazyAgentRegistry:
             "rag_knowledge": "ask-question",
             "memory_query": "memory-query",
             "information_query": "query-info",
-"event_collection": "event-collection",
+            "event_collection": "event-collection",
             "need_stimulation": "need-stimulation",
         }
 
