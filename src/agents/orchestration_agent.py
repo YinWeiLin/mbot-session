@@ -157,6 +157,8 @@ class OrchestrationAgent(AgentBase):
                 # 有具体意图 + 有追问 → 继续走 RAG，追问会在 _aggregate_results 后附上
                 # 无追问（信息齐了）→ 继续走 RAG，不追问
 
+        # event_collection 已在上方单独执行过，从 schedule 中去重防止二次调用
+        agent_schedule = [t for t in agent_schedule if t.get("agent_name") != "event_collection"]
         sorted_schedule = sorted(agent_schedule, key=lambda x: x.get("priority", 999))
 
         logger.info(f"开始协调调度 {len(sorted_schedule)} 个智能体")

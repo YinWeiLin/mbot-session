@@ -32,6 +32,10 @@ class MemoryManager:
         self.short_term = ShortTermMemory(max_turns=10)
         self.long_term = LongTermMemory(user_id, storage_path)
 
+        # 长期摘要本地缓存：避免每轮重复 LLM 调用
+        self._summary_cache: str = ""
+        self._summary_cache_msg_count: int = -1
+
         logger.info(f"记忆管理器初始化完成，用户: {user_id}，会话: {session_id}")
 
     # ========== 短期记忆操作 ==========
@@ -84,6 +88,11 @@ class MemoryManager:
         if not history_from_other_sessions:
             return ""
 
+        # 消息条数没变，直接返回缓存，跳过 LLM 调用
+        if len(history_from_other_sessions) == self._summary_cache_msg_count:
+            logger.info("长期记忆摘要命中缓存，跳过 LLM 总结")
+            return self._summary_cache
+
         history_str = self._format_history_msg_text(history_from_other_sessions[-max_messages:])
 
         # 使用LLM总结
@@ -95,7 +104,9 @@ class MemoryManager:
             summary = await parse_llm_response(response)
 
             logger.info(f"长期记忆摘要生成完成（{len(summary)} 字）")
-            return summary.strip()
+            self._summary_cache = summary.strip()
+            self._summary_cache_msg_count = len(history_from_other_sessions)
+            return self._summary_cache
 
         except Exception as e:
             logger.error(f"生成长期记忆摘要失败: {e}")

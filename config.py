@@ -10,7 +10,7 @@ LLM_CONFIG = {
     "model_name": os.getenv("LLM_MODEL_NAME", "deepseek-v4-pro"),
     "base_url": os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
     "temperature": 0.7,
-    "max_tokens": 8192,
+    "max_tokens": 2048,
 }
 
 # System Configuration

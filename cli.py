@@ -139,8 +139,8 @@ class CliRunner:
                 elif cmd == "preferences":
                     self._show_preferences()
                 else:
-                    with self.console.status("思考中...", spinner="dots"):
-                        reply = await self.session.process_query(user_input)
+                    self.console.print("[dim]思考中...[/dim]")
+                    reply = await self.session.process_query(user_input)
                     self.console.print(f"\n{reply}\n")
 
             except KeyboardInterrupt:

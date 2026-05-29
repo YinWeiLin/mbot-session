@@ -108,12 +108,16 @@ class MbotSession:
             except CircuitOpenError:
                 return "服务暂时不可用，请稍后再试。"
 
+        import time
+        t0 = time.time()
+
         rc = RESILIENCE_CONFIG
         max_retries = rc.get("max_retries", 3)
 
         # 1. 构建上下文：获取长期记忆与短期五轮记忆
         long_term_summary = await self._get_long_term_summary(user_input)
         recent_context = self.memory_manager.short_term.get_recent_context(n_turns=5)
+        print(f"  ⏱ 长期记忆: {time.time()-t0:.2f}s")
 
         context_messages = []
         if long_term_summary:
@@ -123,6 +127,7 @@ class MbotSession:
         context_messages.append(Msg(name="user", content=user_input, role="user"))
 
         # 2. 意图识别
+        t1 = time.time()
         try:
             intention_result = await retry_with_backoff(
                 lambda: self.intention_agent.reply(context_messages),
@@ -138,6 +143,8 @@ class MbotSession:
             if self.circuit_breaker:
                 self.circuit_breaker.record_failure()
             raise
+        logger.info(f"[耗时] IntentionAgent: {time.time()-t1:.2f}s")
+        print(f"  ⏱ IntentionAgent: {time.time()-t1:.2f}s")
 
         # 3. 校验意图结果，并推进会话阶段（只进不退），写回后调度器拿到的永远是历史最高阶段
         try:
@@ -172,6 +179,7 @@ class MbotSession:
         self.memory_manager.add_message("user", user_input)
 
         # 5. 调度智能体
+        t2 = time.time()
         try:
             orchestration_result = await retry_with_backoff(
                 lambda: self.orchestrator.reply(intention_result),
@@ -187,6 +195,8 @@ class MbotSession:
             if self.circuit_breaker:
                 self.circuit_breaker.record_failure()
             raise
+        logger.info(f"[耗时] OrchestrationAgent: {time.time()-t2:.2f}s | 总计: {time.time()-t0:.2f}s")
+        print(f"  ⏱ OrchestrationAgent: {time.time()-t2:.2f}s  |  总计: {time.time()-t0:.2f}s")
 
         # 6. 解析并返回结果
         try:
