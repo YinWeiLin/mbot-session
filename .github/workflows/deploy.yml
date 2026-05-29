@@ -62,6 +62,7 @@ jobs:
                         --restart unless-stopped \
                         -p 8000:8000 \
                         -e LLM_API_KEY=${{ secrets.LLM_API_KEY }} \
+                        -e LLM_MODEL_NAME=${{ secrets.LLM_MODEL_NAME }} \
                         -e SILICONFLOW_API_KEY=${{ secrets.SILICONFLOW_API_KEY }} \
                         -v /home/${{ secrets.SERVER_USER }}/mbot-data/memory:/app/data/memory \
                         -v /home/${{ secrets.SERVER_USER }}/mbot-data/logs:/app/data/logs \
