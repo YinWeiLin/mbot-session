@@ -7,10 +7,12 @@
 import sys
 import importlib.util
 import inspect
+import logging
 from pathlib import Path
 from typing import Dict, Optional
-from rich.console import Console
 from agentscope.agent import AgentBase
+
+logger = logging.getLogger(__name__)
 
 class LazyAgentRegistry:
     """
@@ -31,8 +33,6 @@ class LazyAgentRegistry:
         self.model = model
         self.cache = cache
         self.memory_manager = memory_manager
-        self.console = Console()
-        
         # 技能目录路径
         self.skills_root = Path(".claude/skills")
         
@@ -54,7 +54,7 @@ class LazyAgentRegistry:
     def _discover_skills(self):
         """扫描 .claude/skills 目录寻找可用的 Agent"""
         if not self.skills_root.exists():
-            self.console.print(f"[yellow]警告：技能目录 {self.skills_root} 不存在[/yellow]")
+            logger.warning(f"技能目录 {self.skills_root} 不存在")
             return
 
         for skill_dir in self.skills_root.iterdir():
@@ -89,7 +89,7 @@ class LazyAgentRegistry:
 
         script_path = self._skill_map[skill_name]
         
-        self.console.print(f"[dim]🔄 正在加载 {agent_name} (from {skill_name})...[/dim]")
+        logger.debug(f"正在加载 {agent_name} (from {skill_name})")
         
         try:
             # 1. 动态加载模块
@@ -134,12 +134,12 @@ class LazyAgentRegistry:
             
             # 4. 缓存
             self.cache[agent_name] = agent_instance
-            self.console.print(f"[dim]✓ {agent_name} 加载完成[/dim]")
+            logger.info(f"{agent_name} 加载完成")
             
             return agent_instance
             
         except Exception as e:
-            self.console.print(f"[red]✗ 加载 {agent_name} 失败: {e}[/red]")
+            logger.error(f"加载 {agent_name} 失败: {e}")
             import traceback
             traceback.print_exc()
             raise

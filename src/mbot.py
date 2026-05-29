@@ -111,9 +111,10 @@ class MbotSession:
         rc = RESILIENCE_CONFIG
         max_retries = rc.get("max_retries", 3)
 
-        # 1. 构建上下文
+        # 1. 构建上下文：获取长期记忆与短期五轮记忆
         long_term_summary = await self._get_long_term_summary(user_input)
         recent_context = self.memory_manager.short_term.get_recent_context(n_turns=5)
+
         context_messages = []
         if long_term_summary:
             context_messages.append(Msg(name="system", content=long_term_summary, role="system"))
@@ -225,22 +226,6 @@ class MbotSession:
             parts.append("\n【历史会话总结】")
             parts.append(chat_summary)
 
-        all_trips = self.memory_manager.long_term.get_trip_history(limit=None)
-        if all_trips:
-            relevant = [t for t in all_trips if
-                        (t.get("origin", "") and t["origin"] in user_input) or
-                        (t.get("destination", "") and t["destination"] in user_input)]
-            others = [t for t in all_trips if t not in relevant]
-            to_show = relevant[:2] + others[:1]
-            if to_show:
-                parts.append("\n【历史行程】")
-                for i, t in enumerate(to_show[:3], 1):
-                    mark = "✦ " if t in relevant else ""
-                    parts.append(
-                        f"{i}. {mark}{t.get('origin','未知')} → {t.get('destination','未知')} "
-                        f"({t.get('start_date','')}) - {t.get('purpose','')}"
-                    )
-
         return "\n".join(parts) if parts else ""
 
     def _collect_reply(self, result_data: dict) -> str:
@@ -249,7 +234,7 @@ class MbotSession:
 
         if not results:
             if result_data.get("status") == "no_agents":
-                return "好的，我已记录下来。您可以继续补充信息。"
+                return "欢迎咨询 Wilyn 公考！请问您是准备备考笔试还是面试呢？有什么想了解的都可以问我～"
             return "未能获取有效结果，请重新描述您的需求。"
 
         lines = []

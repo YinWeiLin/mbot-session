@@ -100,6 +100,7 @@ def get_intention_prompt(
 **说明：**
 - 一般咨询优先使用 rag_knowledge，知识库无法覆盖时才用 information_query
 - 用户引用历史时使用 memory_query
+- **打招呼、闲聊（general_chat）必须安排 event_collection**，不能输出空 agent_schedule
 - need_stimulation（需求激发）由系统自动插入，**不要在 agent_schedule 里安排它**
 
 请开始分析，直接输出JSON："""

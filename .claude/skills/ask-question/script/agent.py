@@ -254,7 +254,7 @@ class RAGKnowledgeAgent(AgentBase):
             if not skill_instruction:
                 skill_instruction = "请基于知识库中的信息回答用户的问题。"
 
-            prompt = f"""你是考德上教育的智能客服，熟悉公务员考试（公考）培训相关知识。请严格基于以下知识库中的信息回答用户的问题。
+            prompt = f"""你是WiLyn教育的智能客服，熟悉公务员考试（公考）培训相关知识。请严格基于以下知识库中的信息回答用户的问题。
 
 【用户问题】
 {user_query}
@@ -274,7 +274,7 @@ class RAGKnowledgeAgent(AgentBase):
 
             try:
                 messages = [
-                    {"role": "system", "content": "你是考德上教育的智能客服，熟悉公务员考试培训相关知识。"},
+                    {"role": "system", "content": "你是WiLyn教育的智能客服，熟悉公务员考试培训相关知识。"},
                     {"role": "user", "content": prompt}
                 ]
                 response = await self.model(messages)

@@ -81,18 +81,13 @@ class MemoryManager:
             if msg.get("session_id") != self.session_id
         ]
 
-        # 获取行程历史
-        trip_history = self.long_term.get_trip_history(limit=20)
-
-        # 如果既没有聊天记录也没有行程记录，直接返回
-        if not history_from_other_sessions and not trip_history:
+        if not history_from_other_sessions:
             return ""
 
         history_str = self._format_history_msg_text(history_from_other_sessions[-max_messages:])
-        trip_str = self._format_history_trip_text(trip_history)
 
         # 使用LLM总结
-        summarization_prompt = get_long_term_summary_prompt(history_str, trip_str)
+        summarization_prompt = get_long_term_summary_prompt(history_str)
 
         try:
             # 调用模型（异步调用）
@@ -116,24 +111,6 @@ class MemoryManager:
             timestamp = msg.get("timestamp", "")
             history_text.append(f"[{timestamp}] {role}: {content}")
         return "\n".join(history_text) if history_text else "（无聊天记录）"
-
-    def _format_history_trip_text(self, trips: list[dict]) -> str:
-        trip_text = []
-        for trip in trips:
-            origin = trip.get("origin", "未知")
-            destination = trip.get("destination", "未知")
-            start_date = trip.get("start_date", "")
-            end_date = trip.get("end_date", "")
-            purpose = trip.get("purpose", "旅游")
-            timestamp = trip.get("timestamp", "")
-
-            if start_date and end_date:
-                trip_text.append(f"[{timestamp}] {origin} → {destination} ({start_date} 至 {end_date}) - {purpose}")
-            elif start_date:
-                trip_text.append(f"[{timestamp}] {origin} → {destination} ({start_date}) - {purpose}")
-            else:
-                trip_text.append(f"[{timestamp}] {origin} → {destination} - {purpose}")
-        return "\n".join(trip_text) if trip_text else "（无行程记录）"
 
     def get_long_term_summary(self, max_messages: int = 50) -> str:
         """

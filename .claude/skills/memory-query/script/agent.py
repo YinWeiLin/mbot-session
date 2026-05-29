@@ -3,15 +3,13 @@
 职责：基于用户的长期记忆回答历史相关问题
 
 核心功能：
-1. 查询用户旅行历史（trip_history）
-2. 查询用户偏好（preferences）
-3. 查询历史对话记录（chat_history）
-4. 使用LLM基于记忆生成自然语言回答
+1. 查询用户偏好（preferences）
+2. 查询历史对话记录（chat_history）
+3. 使用LLM基于记忆生成自然语言回答
 
 适用场景：
-- 用户询问："我去过哪些地方？"
 - 用户询问："我之前说过什么偏好？"
-- 用户询问："我上次去北京是什么时候？"
+- 用户询问："我上次咨询过什么课程？"
 """
 from agentscope.agent import AgentBase
 from agentscope.message import Msg
@@ -94,14 +92,10 @@ class MemoryQueryAgent(AgentBase):
             )
 
         # 获取长期记忆
-        trip_history = []
         preferences = {}
         chat_summary = ""
 
         if self.memory_manager:
-            # 获取旅行历史（最近50条）
-            trip_history = self.memory_manager.long_term.get_trip_history(limit=50)
-
             # 获取用户偏好
             preferences = self.memory_manager.long_term.get_preference()
 
@@ -112,9 +106,6 @@ class MemoryQueryAgent(AgentBase):
                 logger.warning(f"Failed to get chat summary: {e}")
                 chat_summary = ""
 
-        # 格式化旅行历史
-        trip_text = self._format_trip_history(trip_history)
-
         # 格式化偏好
         pref_text = self._format_preferences(preferences)
 
@@ -124,15 +115,12 @@ class MemoryQueryAgent(AgentBase):
             skill_instruction = "请基于用户的历史记忆回答问题，如无相关记录请诚实说明。"
 
         # 构建 prompt
-        prompt = f"""你是一个个人记忆助手，请基于用户的历史记忆回答问题。
+        prompt = f"""你是WiLyn教育的智能客服，请基于用户的历史咨询记录回答问题。
 
 【用户问题】
 {user_query}
 
-【用户旅行历史】
-{trip_text}
-
-【用户偏好】
+【用户备考偏好】
 {pref_text}
 
 【历史对话摘要】
@@ -162,7 +150,6 @@ class MemoryQueryAgent(AgentBase):
                 "query": user_query,
                 "answer": answer,
                 "memory_sources": {
-                    "trip_count": len(trip_history),
                     "has_preferences": any(v for v in preferences.values() if v),
                     "has_chat_summary": bool(chat_summary)
                 }
@@ -185,29 +172,6 @@ class MemoryQueryAgent(AgentBase):
                 role="assistant"
             )
 
-    def _format_trip_history(self, trip_history: List[Dict]) -> str:
-        """格式化旅行历史"""
-        if not trip_history:
-            return "（暂无旅行记录）"
-
-        lines = []
-        for i, trip in enumerate(trip_history, 1):
-            origin = trip.get("origin", "未知")
-            destination = trip.get("destination", "未知")
-            start_date = trip.get("start_date", "")
-            end_date = trip.get("end_date", "")
-            purpose = trip.get("purpose", "旅游")
-            timestamp = trip.get("timestamp", "")
-
-            if start_date and end_date:
-                lines.append(f"{i}. {origin} → {destination} ({start_date} 至 {end_date}) - {purpose}")
-            elif start_date:
-                lines.append(f"{i}. {origin} → {destination} ({start_date}) - {purpose}")
-            else:
-                lines.append(f"{i}. {origin} → {destination} - {purpose} (记录时间: {timestamp})")
-
-        return "\n".join(lines)
-
     def _format_preferences(self, preferences: Dict) -> str:
         """格式化用户偏好"""
         if not preferences or not any(v for v in preferences.values() if v):
@@ -215,16 +179,18 @@ class MemoryQueryAgent(AgentBase):
 
         lines = []
         pref_names = {
-            "budget": "预算偏好",
-            "accommodation": "住宿偏好",
-            "transportation": "交通偏好",
-            "food": "餐饮偏好",
-            "activity": "活动偏好",
-            "other": "其他偏好"
+            "exam_type": "考试类型",
+            "target_position": "目标岗位",
+            "study_status": "备考状态",
+            "exam_stage": "当前阶段",
+            "budget": "预算范围",
+            "location": "所在城市",
+            "peak_session_stage": "历史最高意向阶段",
         }
 
         for key, value in preferences.items():
-            if value and key in pref_names:
-                lines.append(f"- {pref_names[key]}: {value}")
+            if value:
+                label = pref_names.get(key, key)
+                lines.append(f"- {label}: {value}")
 
         return "\n".join(lines) if lines else "（暂无偏好记录）"

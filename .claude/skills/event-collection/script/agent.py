@@ -64,7 +64,7 @@ class EventCollectionAgent(AgentBase):
         ]
         known_section = ("【已知用户信息】\n" + "\n".join(known_parts) + "\n\n") if known_parts else ""
 
-        prompt = f"""你是考德上教育的智能客服，负责了解用户备考需求以便推荐合适的课程。
+        prompt = f"""你是WiLyn教育的智能客服，负责了解用户备考需求以便推荐合适的课程。
 
 {known_section}【用户输入】
 {user_query}

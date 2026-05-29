@@ -106,7 +106,7 @@ class OrchestrationAgent(AgentBase):
                 role="assistant"
             )
 
-        # 按优先级排序，need_stimulation 由调度器按策略插入
+        # 按优先级排序，need_stimulation 由调度器按策略插入 判断当前会话阶段
         if self._should_engage(intention_data):
             agent_schedule.append({
                 "agent_name": "need_stimulation",
@@ -128,6 +128,7 @@ class OrchestrationAgent(AgentBase):
         )
 
         # 需求澄清：LOOKING / CONSIDERING 阶段运行，ACTING 阶段跳过
+        context = self._prepare_context(intention_data)
         clarif_result = None
         if stage in (SessionStage.LOOKING, SessionStage.CONSIDERING):
             context = self._prepare_context(intention_data)
@@ -159,9 +160,6 @@ class OrchestrationAgent(AgentBase):
         sorted_schedule = sorted(agent_schedule, key=lambda x: x.get("priority", 999))
 
         logger.info(f"开始协调调度 {len(sorted_schedule)} 个智能体")
-
-        # 准备上下文信息
-        context = self._prepare_context(intention_data)
 
         # 并行执行智能体（按优先级分组）
         results = []
